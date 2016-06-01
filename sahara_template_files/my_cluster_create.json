@@ -1,0 +1,9 @@
+{
+    "name": "{CLUSTER_NAME}",
+    "plugin_name": "{PLUGIN_NAME}",
+    "hadoop_version": "{HADOOP_VERSION}",
+    "cluster_template_id" : "{CLUSTER_TEMPLATE_ID}",
+    "user_keypair_id": "{KEYPAIR_NAME}",
+    "default_image_id": "{DEFAULT_IMAGE_ID}",
+    "neutron_management_network": "{NETWORK_ID}"
+}

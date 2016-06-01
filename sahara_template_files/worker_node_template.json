@@ -1,0 +1,13 @@
+{
+    "plugin_name": "{PLUGIN_NAME}",
+    "hadoop_version": "{HADOOP_VERSION}",
+    "node_processes": [
+        "DataNode",
+        "NodeManager"
+    ],
+    "name": "{TEMPLATE_NAME}-worker",
+    "floating_ip_pool": "{FLOATING_IP_POOL_ID}",
+    "flavor_id": "{CLUSTER_FLAVOR_ID}",
+    "auto_security_group": {AUTO_SECURITY_GROUP},
+    "security_groups": {SECURITY_GROUPS}
+}
