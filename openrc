@@ -1,10 +1,10 @@
 #!/bin/sh
 export LC_ALL=C
 export OS_NO_CACHE='true'
-export OS_TENANT_NAME='test'
-export OS_PROJECT_NAME='test'
-export OS_USERNAME='test'
-export OS_PASSWORD='test'
+export OS_TENANT_NAME='tseri'
+export OS_PROJECT_NAME='tseri'
+export OS_USERNAME='tseri'
+export OS_PASSWORD='tseri'
 export OS_AUTH_URL='https://10.245.123.2:5000/v2.0'
 export OS_DEFAULT_DOMAIN='default'
 export OS_AUTH_STRATEGY='keystone'

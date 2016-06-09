@@ -9,7 +9,18 @@ source vars/cluster.vars
 function setup () {
   mkdir $WORKING_DIR
   cp -r $TEMPLATE_DIR/*.json $WORKING_DIR/
-
+  #############################
+  # Setup Python Dependencies
+  #############################
+  sudo apt-get install python-pip python-dev python-pip
+  sudo pip install python-openstackclient \
+		netifaces \
+		msgpack-python \
+		wrapt \
+		requestsexceptions \
+		appdirs \
+		simplejson
+  sudo pip install --upgrade warlock
   #############################################
   # Setup Master & Worker Node Group Template
   #############################################
@@ -125,9 +136,9 @@ function setup_security_group () {
 # Create Node Templates
 ################################
 function create_node_templates () {
-  sahara --insecure node-group-template-create --json $WORKING_DIR/worker_node_template.json &> /dev/null
+  openstack --insecure dataprocessing node group template create --json $WORKING_DIR/worker_node_template.json &> /dev/null
   echo "INFO: Worker Node Template Created"
-  sahara --insecure node-group-template-create --json $WORKING_DIR/master_node_template.json &> /dev/null
+  openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master_node_template.json &> /dev/null
   echo "INFO: Master Node Template Created"
 }
 ################################
@@ -135,16 +146,15 @@ function create_node_templates () {
 ################################
 function create_cluster_template () {
   sleep 2
-  WORKER_NODE_ID=`sahara --insecure node-group-template-list | grep $TEMPLATE_NAME-worker | awk '{print$4}'`
-  MASTER_NODE_ID=`sahara --insecure node-group-template-list | grep $TEMPLATE_NAME-master | awk '{print$4}'`
+  WORKER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep $TEMPLATE_NAME-worker | awk '{print$4}'`
+  MASTER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep $TEMPLATE_NAME-master | awk '{print$4}'`
   echo "Worker Node ID: [$WORKER_NODE_ID]"
   echo "Master Node ID: [$MASTER_NODE_ID]"
   for i in $WORKING_DIR/*.json; do
       sed -i "s/{WORKER_NODE_ID}/$WORKER_NODE_ID/" $i
       sed -i "s/{MASTER_NODE_ID}/$MASTER_NODE_ID/" $i
   done
-  #sahara --insecure cluster-template-create --json $WORKING_DIR/cluster_template.json &> /dev/null
-  sahara --insecure cluster-template-create --json $WORKING_DIR/cluster_template.json
+  openstack --insecure dataprocessing cluster template create --json $WORKING_DIR/cluster_template.json
   echo "INFO: Cluster Group Template Created"
 }
 
@@ -153,22 +163,22 @@ function create_cluster_template () {
 ##################
 function deploy_cluster () {
   sleep 2
-  CLUSTER_TEMPLATE_ID=`sahara --insecure cluster-template-list |grep $TEMPLATE_NAME-cluster | awk '{print $4}'`
+  CLUSTER_TEMPLATE_ID=`openstack --insecure dataprocessing cluster template list |grep $TEMPLATE_NAME-cluster | awk '{print $4}'`
   echo "INFO: Creating keypair [$CLUSTER_KEYPAIR]"
   # Create Keypair
   openstack --insecure keypair create $CLUSTER_KEYPAIR > $WORKING_DIR/$CLUSTER_KEYPAIR
   chmod 600 $WORKING_DIR/$CLUSTER_KEYPAIR
   #nova keypair-add $KEY_PAIR_NAME > $WORKING_DIR/KEY_PAIR_NAME.pem
-  DEFAULT_IMAGE_ID=`nova --insecure image-list | grep $CLUSTER_IMAGE | awk '{print$2}'`
+  DEFAULT_IMAGE_ID=`openstack --insecure image list | grep $CLUSTER_IMAGE | awk '{print$2}'`
   for i in $WORKING_DIR/*.json; do
       sed -i "s/{CLUSTER_TEMPLATE_ID}/$CLUSTER_TEMPLATE_ID/" $i
       sed -i "s/{KEYPAIR_NAME}/$CLUSTER_KEYPAIR/" $i
       sed -i "s/{DEFAULT_IMAGE_ID}/$DEFAULT_IMAGE_ID/" $i
   done
   
-  sahara --insecure cluster-create --json $WORKING_DIR/my_cluster_create.json &> /dev/null
+  openstack --insecure dataprocessing cluster create --json $WORKING_DIR/my_cluster_create.json &> /dev/null
   echo "INFO: Cluster successfully deployed!"
-  sahara --insecure cluster-list
+  openstack --insecure dataprocessing cluster list
 }
 
 ######################################################
