@@ -198,21 +198,21 @@ function cleanup () {
   while true;
   do
     count=$(($count+1))
-    CLUSTER_STATUS="sahara --insecure cluster-list"
+    CLUSTER_STATUS="openstack --insecure dataprocessing cluster list"
     if [[ $($CLUSTER_STATUS |grep $CLUSTER_NAME |awk '{print $2}') == $CLUSTER_NAME ]];
     then
       echo "Cluster [$CLUSTER_NAME] is not deleted"
       echo "Deleting Cluster [$CLUSTER_NAME]"
  
       # Cleanup Cluster
-      sahara --insecure cluster-delete --name $CLUSTER_NAME
+      openstack --insecure dataprocessing cluster delete $CLUSTER_NAME
     else 
       # Cleanup Cluster Template
-      sahara --insecure cluster-template-delete --name $TEMPLATE_NAME-cluster
+      openstack --insecure dataprocessing cluster template delete $TEMPLATE_NAME-cluster
 
       # Cleanup Node Temaplate
-      sahara --insecure node-group-template-delete --name $TEMPLATE_NAME-worker 
-      sahara --insecure node-group-template-delete --name $TEMPLATE_NAME-master
+      openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-worker 
+      openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master
 
       echo "Cluster $CLUSTER_NAME, Cluster Template and Node Templates Deleted"
       break # Exit Loop and continue with script.
