@@ -2,12 +2,16 @@
     "plugin_name": "{PLUGIN_NAME}",
     "hadoop_version": "{HADOOP_VERSION}",
     "node_processes": [
-        "DataNode",
-        "NodeManager"
+	"JournalNode",
+	"YARN Timeline Server",
+	"MapReduce History Server",
+	"ResourceManager",
+        "ZooKeeper",
+	"Oozie"
     ],
-    "name": "{TEMPLATE_NAME}-worker",
+    "name": "{TEMPLATE_NAME}-master3",
     "floating_ip_pool": "{FLOATING_IP_POOL_ID}",
-    "flavor_id": "{WORKER_CLUSTER_FLAVOR_ID}",
+    "flavor_id": "{MASTER_CLUSTER_FLAVOR_ID}",
     "auto_security_group": {AUTO_SECURITY_GROUP},
     "security_groups": {SECURITY_GROUPS}
 }

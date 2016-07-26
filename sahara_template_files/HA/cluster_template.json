@@ -1,0 +1,33 @@
+{
+    "plugin_name": "{PLUGIN_NAME}",
+    "hadoop_version": "{HADOOP_VERSION}",
+    "node_groups": [
+        {
+            "name": "{TEMPLATE_NAME}-worker",
+            "count": "{WORKER_COUNT}",
+            "node_group_template_id": "{WORKER_NODE_ID}"
+        },
+        {
+            "name": "{TEMPLATE_NAME}-master1",
+            "count": "{MASTER_COUNT}",
+            "node_group_template_id": "{MASTER1_NODE_ID}"
+        },
+        {
+            "name": "{TEMPLATE_NAME}-master2",
+            "count": "{MASTER_COUNT}",
+            "node_group_template_id": "{MASTER2_NODE_ID}"
+        },
+        {
+            "name": "{TEMPLATE_NAME}-master3",
+            "count": "{MASTER_COUNT}",
+            "node_group_template_id": "{MASTER3_NODE_ID}"
+        }
+    ],
+    "name": "{TEMPLATE_NAME}-HA-cluster",
+    "neutron_management_network": "{NETWORK_ID}",
+    "cluster_configs": {
+        "general": {
+        	"NameNode_HA": true
+	}
+    }
+}

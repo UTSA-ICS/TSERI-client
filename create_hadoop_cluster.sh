@@ -9,22 +9,23 @@ source vars/cluster.vars
 function setup () {
   mkdir $WORKING_DIR
   cp -r $TEMPLATE_DIR/*.json $WORKING_DIR/
+  cp -r $TEMPLATE_DIR/$HA_MODE/*.json $WORKING_DIR/
   #############################
   # Setup Python Dependencies
   #############################
-  sudo apt-get install python-pip python-dev python-pip
-  sudo pip install python-openstackclient \
-		netifaces \
-		msgpack-python \
-		wrapt \
-		requestsexceptions \
-		appdirs \
-		simplejson
-  sudo pip install --upgrade warlock
+  #sudo apt-get install python-pip python-dev python-pip
+  #sudo pip install python-openstackclient \
+#		netifaces \
+#		msgpack-python \
+#		wrapt \
+#		requestsexceptions \
+#		appdirs \
+#		simplejson
+#  sudo pip install --upgrade warlock
   #############################################
   # Setup Master & Worker Node Group Template
   #############################################
-  NETWORK_ID=`openstack --insecure network list | grep $NETWORK_NAME | awk '{print$2}'`
+  NETWORK_ID=`openstack --insecure network list | grep "$NETWORK_NAME " | awk '{print$2}'`
   FLOATING_IP_POOL_ID=`openstack --insecure network list |grep $EXTERNAL_NETWORK |awk '{print $2}'`
 
   # Setup the security groups and rules
@@ -38,7 +39,8 @@ function setup () {
       sed -i "s/{HADOOP_VERSION}/$HADOOP_VERSION/" $i
       sed -i "s/{FLOATING_IP_POOL_ID}/$FLOATING_IP_POOL_ID/" $i
       sed -i "s/{AUTO_SECURITY_GROUP}/$AUTO_SECURITY_GROUP/" $i
-      sed -i "s/{CLUSTER_FLAVOR_ID}/$CLUSTER_FLAVOR_ID/" $i
+      sed -i "s/{MASTER_CLUSTER_FLAVOR_ID}/$MASTER_CLUSTER_FLAVOR_ID/" $i
+      sed -i "s/{WORKER_CLUSTER_FLAVOR_ID}/$WORKER_CLUSTER_FLAVOR_ID/" $i
       sed -i "s/{EXTERNAL_NETWORK}/$EXTERNAL_NETWORK/" $i
       sed -i "s/{KEY_PAIR_NAME}/$KEY_PAIR_NAME/" $i
       sed -i "s/{SECURITY_GROUPS}/$SECURITY_GROUP_IDS/" $i
@@ -55,7 +57,7 @@ function setup () {
 function setup_security_group () {
   # Get Security Group IDs
   for i in $SECURITY_GROUPS; do
-    SECURITY_GROUP_STATUS=`openstack --insecure security group list |grep $i |awk '{print $4}'`
+    SECURITY_GROUP_STATUS=`openstack --insecure security group list |grep " $i " |awk '{print $4}'`
     # Ensure Security Groups are present, if not then create them
     # https://github.com/openstack/python-openstackclient/blob/master/openstackclient/network/v2/security_group_rule.py
     if [[ -z $SECURITY_GROUP_STATUS ]]
@@ -84,6 +86,7 @@ function setup_security_group () {
           # Kerberos                        - UDP 88    - Egress
           # NetBIOS Datagram Service        - TCP 139   - Egress
           # LDAP                            - TCP 389   - Egress/Ingress 
+          # LDAP                            - TCP 636   - Egress/Ingress 
           # LDAP                            - UDP 389   - Egress
           # Microsoft DS                    - TCP 445   - Egress
           openstack --insecure security group rule create --proto tcp --dst-port 53:53 activedirectory --ingress 
@@ -94,6 +97,8 @@ function setup_security_group () {
           openstack --insecure security group rule create --proto tcp --dst-port 389:389 activedirectory --egress
           openstack --insecure security group rule create --proto tcp --dst-port 389:389 activedirectory --ingress
           openstack --insecure security group rule create --proto udp --dst-port 389:389 activedirectory --egress
+          openstack --insecure security group rule create --proto tcp --dst-port 636:636 activedirectory --egress
+          openstack --insecure security group rule create --proto tcp --dst-port 636:636 activedirectory --ingress
           openstack --insecure security group rule create --proto tcp --dst-port 445:445 activedirectory --egress
           ;;
         "rstudio")
@@ -116,12 +121,18 @@ function setup_security_group () {
           openstack --insecure security group rule create --proto tcp --dst-port 443:443 jupyter --egress
           openstack --insecure security group rule create --proto tcp --dst-port 443:443 jupyter --ingress
           ;;
+        "hdp")
+          openstack --insecure security group create --description "HDP specific security rules" hdp
+          # Install applications            - TCP 80    - Egress/Ingress
+          # Install applications over SSL   - TCP 443   - Egress/Ingress
+          openstack --insecure security group rule create --proto tcp --dst-port 6080:6080 hdp --ingress
+	  ;;
         *)
           break
       esac
       echo "Done with Security Groups and security group rules"
     fi
-    SEC_ID=`openstack --insecure security group list |grep $i |awk '{print $2}'`
+    SEC_ID=`openstack --insecure security group list |grep " $i " |awk '{print $2}'`
     if [[ -z $SECURITY_GROUP_IDS ]]
     then
       SECURITY_GROUP_IDS="\"$SEC_ID\""
@@ -138,7 +149,13 @@ function setup_security_group () {
 function create_node_templates () {
   openstack --insecure dataprocessing node group template create --json $WORKING_DIR/worker_node_template.json &> /dev/null
   echo "INFO: Worker Node Template Created"
-  openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master_node_template.json &> /dev/null
+  if [ $HA_MODE == "non-HA" ]; then
+    openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master_node_template.json &> /dev/null
+  else
+    openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master1_node_template.json &> /dev/null
+    openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master2_node_template.json &> /dev/null
+    openstack --insecure dataprocessing node group template create --json $WORKING_DIR/master3_node_template.json &> /dev/null
+  fi
   echo "INFO: Master Node Template Created"
 }
 ################################
@@ -146,14 +163,34 @@ function create_node_templates () {
 ################################
 function create_cluster_template () {
   sleep 2
-  WORKER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep $TEMPLATE_NAME-worker | awk '{print$4}'`
-  MASTER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep $TEMPLATE_NAME-master | awk '{print$4}'`
+  WORKER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep " $TEMPLATE_NAME-worker"  | awk '{print$4}'`
+  if [ $HA_MODE == "non-HA" ]; then
+    MASTER_NODE_ID=`openstack --insecure dataprocessing node group template list | grep " $TEMPLATE_NAME-master "  | awk '{print$4}'`
+  else
+    MASTER1_NODE_ID=`openstack --insecure dataprocessing node group template list | grep " $TEMPLATE_NAME-master1"  | awk '{print$4}'`
+    MASTER2_NODE_ID=`openstack --insecure dataprocessing node group template list | grep " $TEMPLATE_NAME-master2"  | awk '{print$4}'`
+    MASTER3_NODE_ID=`openstack --insecure dataprocessing node group template list | grep " $TEMPLATE_NAME-master3"  | awk '{print$4}'`
+  fi
   echo "Worker Node ID: [$WORKER_NODE_ID]"
-  echo "Master Node ID: [$MASTER_NODE_ID]"
+  if [ $HA_MODE == "non-HA" ]; then
+    echo "Master Node ID: [$MASTER_NODE_ID]"
+  else
+    echo "Master Node ID: [$MASTER1_NODE_ID]"
+    echo "Master Node ID: [$MASTER2_NODE_ID]"
+    echo "Master Node ID: [$MASTER3_NODE_ID]"
+  fi
+
   for i in $WORKING_DIR/*.json; do
       sed -i "s/{WORKER_NODE_ID}/$WORKER_NODE_ID/" $i
-      sed -i "s/{MASTER_NODE_ID}/$MASTER_NODE_ID/" $i
+      if [ $HA_MODE == "non-HA" ]; then
+        sed -i "s/{MASTER_NODE_ID}/$MASTER_NODE_ID/" $i
+      else
+        sed -i "s/{MASTER1_NODE_ID}/$MASTER1_NODE_ID/" $i
+        sed -i "s/{MASTER2_NODE_ID}/$MASTER2_NODE_ID/" $i
+        sed -i "s/{MASTER3_NODE_ID}/$MASTER3_NODE_ID/" $i
+      fi
   done
+
   openstack --insecure dataprocessing cluster template create --json $WORKING_DIR/cluster_template.json
   echo "INFO: Cluster Group Template Created"
 }
@@ -163,7 +200,7 @@ function create_cluster_template () {
 ##################
 function deploy_cluster () {
   sleep 2
-  CLUSTER_TEMPLATE_ID=`openstack --insecure dataprocessing cluster template list |grep $TEMPLATE_NAME-cluster | awk '{print $4}'`
+  CLUSTER_TEMPLATE_ID=`openstack --insecure dataprocessing cluster template list |grep " $TEMPLATE_NAME-$HA_MODE-cluster" | awk '{print $4}'`
   echo "INFO: Creating keypair [$CLUSTER_KEYPAIR]"
   # Create Keypair
   openstack --insecure keypair create $CLUSTER_KEYPAIR > $WORKING_DIR/$CLUSTER_KEYPAIR
@@ -208,11 +245,17 @@ function cleanup () {
       openstack --insecure dataprocessing cluster delete $CLUSTER_NAME
     else 
       # Cleanup Cluster Template
-      openstack --insecure dataprocessing cluster template delete $TEMPLATE_NAME-cluster
+      openstack --insecure dataprocessing cluster template delete $TEMPLATE_NAME-$HA_MODE-cluster
 
       # Cleanup Node Temaplate
       openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-worker 
-      openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master
+      if [ $HA_MODE == "non-HA" ]; then
+        openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master 
+      else
+        openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master1
+        openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master2
+        openstack --insecure dataprocessing node group template delete $TEMPLATE_NAME-master3
+      fi
 
       echo "Cluster $CLUSTER_NAME, Cluster Template and Node Templates Deleted"
       break # Exit Loop and continue with script.
@@ -239,8 +282,8 @@ function usage () {
   echo "         - Will run all of the commands below except for cleanup"
   echo "  create_node_templates"
   echo "  create_cluster_template"
-  echo "  deploy_cluster"
-  echo "  cleanup"
+  echo "  deploy_cluster <Cluster Name>"
+  echo "  cleanup <Cluster Name>"
   echo ""
   echo ""
 }
@@ -258,6 +301,16 @@ function main () {
 
   CLUSTER_NAME=$2 
   CLUSTER_KEYPAIR=$CLUSTER_NAME$KEYPAIR
+  WORKING_DIR=$WORKING_DIR/$CLUSTER_NAME
+  if [ -z $3 ]; then
+    HA_MODE="non-HA"
+    echo "Setting HA mode to [$HA_MODE]"
+  else
+    HA_MODE=$3
+    echo "Setting HA mode to [$HA_MODE]"
+  fi
+  # Add cluster name to Template name
+  # i.e generate a new template for each cluster
   #TEMPLATE_NAME=$CLUSTER_NAME$TEMPLATE_NAME
   if [ $1 == "deploy" ]; then
     setup
@@ -289,4 +342,4 @@ function main () {
 
 }
 
-main $1 $2
+main $1 $2 $3

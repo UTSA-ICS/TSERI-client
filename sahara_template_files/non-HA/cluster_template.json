@@ -13,7 +13,7 @@
             "node_group_template_id": "{MASTER_NODE_ID}"
         }
     ],
-    "name": "{TEMPLATE_NAME}-cluster",
+    "name": "{TEMPLATE_NAME}-non-HA-cluster",
     "neutron_management_network": "{NETWORK_ID}",
     "cluster_configs": {}
 }

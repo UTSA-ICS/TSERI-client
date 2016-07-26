@@ -1,0 +1,29 @@
+
+Master1
+=======
+NameNode
+JournalNode
+Ambari
+ZooKeeper
+Spark History Server
+
+Master2
+=======
+NameNode
+JournalNode
+ZooKeeper
+Hive Metastore
+HiveServer
+Ranger Admin
+Ranger Usersync
+
+Master3
+=======
+JournalNode
+YARN Timeline Server
+MapReduce History Server
+ResourceManager
+ZooKeeper
+Falcon Server
+Oozie
+
